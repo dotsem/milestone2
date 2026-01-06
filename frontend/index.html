@@ -4,7 +4,7 @@
         <meta charset="UTF-8" />
         <meta http-equiv="X-UA-Compatible" content="IE=edge" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Milestone 2 - SVB</title>
+        <title>Milestone 2</title>
         <!-- 
             FRONTEND HTML FOR KUBERNETES WEBSTACK
             =====================================
@@ -18,18 +18,27 @@
             - The Ingress routes /api/* to the backend service
         -->
         <style>
-            /* Basic styling for demonstration purposes */
             body {
                 font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
                 max-width: 800px;
                 margin: 50px auto;
                 padding: 20px;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                min-height: 100vh;
+                background: black;
+                max-height: 100dvh;
                 color: white;
             }
+
+            #bg-img {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                opacity: 0.5;
+            }
             .container {
-                background: rgba(255, 255, 255, 0.1);
+                background: rgba(216, 209, 187, 0.1);
                 backdrop-filter: blur(10px);
                 border-radius: 20px;
                 padding: 40px;
@@ -39,7 +48,7 @@
                 margin-bottom: 30px;
             }
             .info {
-                background: rgba(255, 255, 255, 0.2);
+                background: rgba(199, 186, 155, 0.2);
                 padding: 15px 25px;
                 border-radius: 10px;
                 margin: 15px 0;
@@ -66,33 +75,23 @@
         </style>
     </head>
     <body>
+        <img id="bg-img" src="./assets/bg.webp" alt="background" />
         <div class="container">
             <h1>
-                🚀 <span id="user" class="loading">Loading...</span> has reached
-                milestone 2!
+                <span id="user" class="loading">Loading...</span> has finished
+                milestone 2! Hip Hop Hooray!
             </h1>
 
             <div class="info">
                 <span class="label">Container ID:</span>
                 <span id="container-id" class="value loading">Loading...</span>
             </div>
-
-            <p style="opacity: 0.7; margin-top: 30px">
-                <em
-                    >Refresh the page to see load balancing in action (Container
-                    ID may change)</em
-                >
-            </p>
         </div>
 
         <script>
-            // ================================================================
-            // FETCH USER NAME FROM API
-            // ================================================================
-            // This calls the FastAPI backend which queries PostgreSQL
-            // WHY /api/user?
-            // - The Ingress routes /api/* to the backend service
-            // - This is a relative path, so it works regardless of the domain
+            const userElement = document.getElementById("user");
+            const containerElement = document.getElementById("container-id");
+            const title = "Milestone 2";
 
             fetch("/api/user")
                 .then((res) => {
@@ -100,25 +99,15 @@
                     return res.json();
                 })
                 .then((data) => {
-                    // Display the user name from the database
-                    const userElement = document.getElementById("user");
                     userElement.innerText = data.name;
                     userElement.classList.remove("loading");
+                    document.title = title + " - " + data.name;
                 })
                 .catch((error) => {
                     console.error("Error fetching user:", error);
-                    const userElement = document.getElementById("user");
                     userElement.innerText = "Error";
                     userElement.classList.add("error");
                 });
-
-            // ================================================================
-            // FETCH CONTAINER ID FROM API
-            // ================================================================
-            // This returns the hostname of the pod that handled the request
-            // WHY display this?
-            // - Demonstrates load balancing across multiple replicas
-            // - Each refresh may show a different container ID
 
             fetch("/api/id")
                 .then((res) => {
@@ -126,16 +115,11 @@
                     return res.json();
                 })
                 .then((data) => {
-                    // Display the container/pod hostname
-                    const containerElement =
-                        document.getElementById("container-id");
                     containerElement.innerText = data.id;
                     containerElement.classList.remove("loading");
                 })
                 .catch((error) => {
                     console.error("Error fetching container ID:", error);
-                    const containerElement =
-                        document.getElementById("container-id");
                     containerElement.innerText = "Error";
                     containerElement.classList.add("error");
                 });
