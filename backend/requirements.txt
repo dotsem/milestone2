@@ -1,0 +1,31 @@
+# Backend Dependencies for Kubernetes Webstack
+# =============================================
+# This file lists all Python packages required by the backend.
+# 
+# HOW TO USE:
+#   pip install -r requirements.txt
+#
+# WHY THESE PACKAGES?
+# -------------------
+
+# FastAPI - The web framework
+# - Modern, fast (high-performance) web framework for building APIs
+# - Automatic interactive API documentation (Swagger UI)
+fastapi==0.115.6
+
+# Uvicorn - ASGI server
+# - Lightning-fast ASGI server implementation
+# - Required to run FastAPI applications
+# - The [standard] extra includes useful dependencies like uvloop
+uvicorn[standard]==0.34.0
+
+# asyncpg - PostgreSQL driver
+# - High-performance async PostgreSQL client
+# - Native asyncio support for non-blocking database operations
+# - Much faster than psycopg2 for async applications
+asyncpg==0.30.0
+
+# Pydantic - Data validation (included with FastAPI, but pinned for stability)
+# - Data validation using Python type annotations
+# - Used for request/response models
+pydantic==2.10.4

@@ -1,0 +1,115 @@
+# Kubernetes Ingress for SVB Webstack
+# ====================================
+# Ingress exposes HTTP routes from outside the cluster to services within.
+#
+# WHY INGRESS?
+# - Single entry point for all traffic
+# - Path-based routing (/ -> frontend, /api -> backend)
+# - Can add TLS/HTTPS easily
+# - More flexible than NodePort
+# - Extra points: "scaling of API across nodes using ingress"
+#
+# PREREQUISITES:
+# - NGINX Ingress Controller must be installed
+# - For kind: kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+#
+# USAGE:
+#   kubectl apply -f ingress.yaml -n svb-webstack
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+    name: svb-ingress
+    namespace: svb-webstack
+    labels:
+        app.kubernetes.io/name: svb-webstack
+        app.kubernetes.io/component: ingress
+    annotations:
+        # Ingress class annotation
+        # WHY kubernetes.io/ingress.class?
+        # - Tells which Ingress controller should handle this
+        # - 'traefik' for Traefik Ingress Controller
+        kubernetes.io/ingress.class: traefik
+
+        # Traefik doesn't use nginx.* annotations.
+        # Rewrites would require Middleware CRDs, but no rewrites are needed here.
+spec:
+    # Ingress class name (Kubernetes 1.18+)
+    ingressClassName: traefik
+
+    # Routing rules
+    rules:
+        # Host-based routing (optional)
+        # WHY no host?
+        # - Matches any hostname (useful for local development)
+        # - Add host: example.com for production
+        - http:
+              paths:
+                  # API routes to backend
+                  # WHY /api prefix?
+                  # - Clear separation between frontend and backend
+                  # - Matches what the frontend JavaScript expects
+                  - path: /api
+                    pathType: Prefix
+                    backend:
+                        service:
+                            name: svb-backend
+                            port:
+                                number: 8000
+
+                  # All other routes to frontend
+                  # WHY / last?
+                  # - More specific paths (/api) should come first
+                  # - / is a catch-all for everything else
+                  - path: /
+                    pathType: Prefix
+                    backend:
+                        service:
+                            name: svb-frontend
+                            port:
+                                number: 80
+
+---
+# ==============================================================================
+# INGRESS WITH TLS (Optional - for HTTPS extra points)
+# ==============================================================================
+# Uncomment this section after setting up cert-manager
+#
+# Prerequisites for HTTPS:
+# 1. Install cert-manager: kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.2/cert-manager.yaml
+# 2. Create a ClusterIssuer (see cert-manager-issuer.yaml)
+# 3. Have a valid domain pointing to your cluster
+#
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: svb-ingress-tls
+#   namespace: svb-webstack
+#   annotations:
+#     kubernetes.io/ingress.class: nginx
+#     cert-manager.io/cluster-issuer: letsencrypt-prod
+# spec:
+#   ingressClassName: nginx
+#   tls:
+#     - hosts:
+#         - your-domain.com
+#       secretName: svb-tls-secret
+#   rules:
+#     - host: your-domain.com
+#       http:
+#         paths:
+#           - path: /api
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: svb-backend
+#                 port:
+#                   number: 8000
+#           - path: /
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: svb-frontend
+#                 port:
+#                   number: 80

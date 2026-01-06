@@ -1,0 +1,102 @@
+# Kind Cluster Configuration for SVB Webstack
+# =============================================
+# This file configures a local Kubernetes cluster using kind (Kubernetes IN Docker).
+#
+# WHY KIND?
+# - Runs Kubernetes in Docker containers
+# - Easy to set up and tear down
+# - Supports multi-node clusters
+# - Perfect for local development and testing
+# - Seen in class, familiar to use
+#
+# USAGE:
+#   kind create cluster --config kind-config.yaml --name svb-cluster
+#   kind delete cluster --name svb-cluster
+#
+# EXTRA POINTS:
+# - This config includes an extra worker node for "+1 point" requirement
+# - Port mapping allows access to Ingress and NodePort services
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+
+# Cluster name
+# WHY svb-cluster?
+# - Uses your initials as per assignment requirements
+# - Easy to identify in 'kind get clusters' output
+name: svb-cluster
+
+# Node configuration
+# WHY multiple nodes?
+# - Control plane: Runs Kubernetes control components (API server, scheduler, etc.)
+# - Worker nodes: Run application workloads (pods)
+# - Extra worker: Required for "+1 point" (scaling across nodes)
+nodes:
+    # ==============================================================================
+    # CONTROL PLANE NODE
+    # ==============================================================================
+    # The control plane runs Kubernetes management components
+    - role: control-plane
+
+      # Port mappings for external access
+      # WHY kubeadmConfigPatches?
+      # - Configures the Ingress controller to listen on host ports
+      # - Makes services accessible from localhost
+      kubeadmConfigPatches:
+          - |
+              kind: InitConfiguration
+              nodeRegistration:
+                kubeletExtraArgs:
+                  node-labels: "ingress-ready=true"
+
+      # Extra port mappings
+      # WHY these ports?
+      # - 80: HTTP (Ingress)
+      # - 443: HTTPS (Ingress with TLS)
+      # - 30080: NodePort for frontend (fallback if Ingress not used)
+      extraPortMappings:
+          # HTTP port for Ingress
+          - containerPort: 80
+            hostPort: 80
+            protocol: TCP
+          # HTTPS port for Ingress (for TLS/cert-manager)
+          - containerPort: 443
+            hostPort: 443
+            protocol: TCP
+          # NodePort for frontend (direct access without Ingress)
+          - containerPort: 30080
+            hostPort: 30080
+            protocol: TCP
+
+    # ==============================================================================
+    # WORKER NODE 1
+    # ==============================================================================
+    # First worker node for running application pods
+    - role: worker
+
+    # ==============================================================================
+    # WORKER NODE 2 (Extra)
+    # ==============================================================================
+    # Second worker node for demonstrating multi-node scaling
+    # WHY a second worker?
+    # - Extra points: "Extra worker in your k8s cluster + scaling of API"
+    # - Shows pods distributed across nodes
+    # - Demonstrates load balancing across nodes
+    - role: worker
+
+# Networking configuration
+networking:
+    # Pod subnet
+    # WHY 10.244.0.0/16?
+    # - Default CIDR for many CNI plugins
+    # - Large enough for many pods
+    podSubnet: "10.244.0.0/16"
+
+    # Service subnet
+    serviceSubnet: "10.96.0.0/12"
+
+    # Disable default CNI
+    # WHY false?
+    # - We want kind to install the default CNI
+    # - Set to true if you want to install your own (like Calico)
+    disableDefaultCNI: false

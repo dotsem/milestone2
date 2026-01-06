@@ -1,0 +1,158 @@
+# Kubernetes FastAPI Backend Deployment
+# ======================================
+# This file defines all resources needed to run the FastAPI backend.
+#
+# RESOURCES DEFINED:
+# 1. Deployment - Manages backend pods with scaling and updates
+# 2. Service - Network endpoint for backend access
+#
+# WHY DEPLOYMENT?
+# - Declarative updates for pods
+# - Rolling updates with zero downtime
+# - Easy scaling and rollback
+#
+# USAGE:
+#   kubectl apply -f backend.yaml -n svb-webstack
+
+---
+# ==============================================================================
+# DEPLOYMENT
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: svb-backend
+    namespace: svb-webstack
+    labels:
+        app.kubernetes.io/name: svb-webstack
+        app.kubernetes.io/component: backend
+spec:
+    # Number of pod replicas
+    # WHY 2 replicas?
+    # - High availability: one pod can serve while another restarts
+    # - Load balancing demonstration (see container ID on frontend)
+    # - Extra points: "scaling of API across nodes"
+    replicas: 2
+
+    # Selector must match template labels
+    selector:
+        matchLabels:
+            app.kubernetes.io/name: svb-webstack
+            app.kubernetes.io/component: backend
+
+    # Update strategy
+    # WHY RollingUpdate?
+    # - Zero-downtime deployments
+    # - Gradually replaces old pods with new ones
+    strategy:
+        type: RollingUpdate
+        rollingUpdate:
+            maxSurge: 1 # Can have 1 extra pod during update
+            maxUnavailable: 0 # All pods must be available during update
+
+    template:
+        metadata:
+            labels:
+                app.kubernetes.io/name: svb-webstack
+                app.kubernetes.io/component: backend
+        spec:
+            containers:
+                - name: backend
+                  # Image built from backend/Dockerfile
+                  # NOTE: For kind, you need to load the image:
+                  #   kind load docker-image svb-backend:latest --name svb-cluster
+                  image: svb-backend:latest
+
+                  # ImagePullPolicy
+                  # WHY Never?
+                  # - For local development with kind
+                  # - Image is loaded directly into kind nodes
+                  # - Change to Always for production with registry
+                  imagePullPolicy: Never
+
+                  # Container port
+                  ports:
+                      - containerPort: 8000
+                        name: http
+
+                  # Environment variables from ConfigMap
+                  envFrom:
+                      - configMapRef:
+                            name: svb-backend-config
+
+                  # Environment variables from Secret
+                  env:
+                      - name: DB_USER
+                        valueFrom:
+                            secretKeyRef:
+                                name: svb-db-credentials
+                                key: POSTGRES_USER
+                      - name: DB_PASSWORD
+                        valueFrom:
+                            secretKeyRef:
+                                name: svb-db-credentials
+                                key: POSTGRES_PASSWORD
+
+                  # Resource limits
+                  resources:
+                      requests:
+                          memory: "128Mi"
+                          cpu: "100m"
+                      limits:
+                          memory: "256Mi"
+                          cpu: "500m"
+
+                  # Liveness probe - restart if unhealthy
+                  # WHY /api/health?
+                  # - Custom health endpoint in FastAPI
+                  # - Checks database connectivity
+                  # - Extra points: "Health check monitoring that restarts automatically"
+                  livenessProbe:
+                      httpGet:
+                          path: /api/health
+                          port: 8000
+                      initialDelaySeconds: 10
+                      periodSeconds: 15
+                      timeoutSeconds: 5
+                      failureThreshold: 3
+
+                  # Readiness probe - remove from load balancer if not ready
+                  readinessProbe:
+                      httpGet:
+                          path: /api/health
+                          port: 8000
+                      initialDelaySeconds: 5
+                      periodSeconds: 5
+                      timeoutSeconds: 3
+                      failureThreshold: 3
+
+---
+# ==============================================================================
+# SERVICE
+# ==============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+    name: svb-backend
+    namespace: svb-webstack
+    labels:
+        app.kubernetes.io/name: svb-webstack
+        app.kubernetes.io/component: backend
+spec:
+    # ClusterIP for internal access
+    # WHY ClusterIP?
+    # - Backend is accessed through Ingress or Frontend
+    # - No need to expose directly
+    type: ClusterIP
+
+    selector:
+        app.kubernetes.io/name: svb-webstack
+        app.kubernetes.io/component: backend
+
+    ports:
+        - port: 8000
+          targetPort: 8000
+          protocol: TCP
+          name: http

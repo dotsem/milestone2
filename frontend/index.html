@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Milestone 2 - SVB</title>
+        <!-- 
+            FRONTEND HTML FOR KUBERNETES WEBSTACK
+            =====================================
+            This page fetches data from the FastAPI backend and displays:
+            1. The user name (from PostgreSQL database)
+            2. The container ID (to demonstrate load balancing)
+            
+            WHY RELATIVE PATHS (/api/...)?
+            - Using Ingress, both frontend and backend are served from the same domain
+            - This avoids CORS issues and hardcoded URLs
+            - The Ingress routes /api/* to the backend service
+        -->
+        <style>
+            /* Basic styling for demonstration purposes */
+            body {
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+                max-width: 800px;
+                margin: 50px auto;
+                padding: 20px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                color: white;
+            }
+            .container {
+                background: rgba(255, 255, 255, 0.1);
+                backdrop-filter: blur(10px);
+                border-radius: 20px;
+                padding: 40px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            }
+            h1 {
+                margin-bottom: 30px;
+            }
+            .info {
+                background: rgba(255, 255, 255, 0.2);
+                padding: 15px 25px;
+                border-radius: 10px;
+                margin: 15px 0;
+                font-size: 1.1em;
+            }
+            .label {
+                font-weight: bold;
+                opacity: 0.8;
+            }
+            .value {
+                font-family: monospace;
+                background: rgba(0, 0, 0, 0.2);
+                padding: 5px 10px;
+                border-radius: 5px;
+                margin-left: 10px;
+            }
+            .loading {
+                opacity: 0.6;
+                font-style: italic;
+            }
+            .error {
+                color: #ff6b6b;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>
+                🚀 <span id="user" class="loading">Loading...</span> has reached
+                milestone 2!
+            </h1>
+
+            <div class="info">
+                <span class="label">Container ID:</span>
+                <span id="container-id" class="value loading">Loading...</span>
+            </div>
+
+            <p style="opacity: 0.7; margin-top: 30px">
+                <em
+                    >Refresh the page to see load balancing in action (Container
+                    ID may change)</em
+                >
+            </p>
+        </div>
+
+        <script>
+            // ================================================================
+            // FETCH USER NAME FROM API
+            // ================================================================
+            // This calls the FastAPI backend which queries PostgreSQL
+            // WHY /api/user?
+            // - The Ingress routes /api/* to the backend service
+            // - This is a relative path, so it works regardless of the domain
+
+            fetch("/api/user")
+                .then((res) => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res.json();
+                })
+                .then((data) => {
+                    // Display the user name from the database
+                    const userElement = document.getElementById("user");
+                    userElement.innerText = data.name;
+                    userElement.classList.remove("loading");
+                })
+                .catch((error) => {
+                    console.error("Error fetching user:", error);
+                    const userElement = document.getElementById("user");
+                    userElement.innerText = "Error";
+                    userElement.classList.add("error");
+                });
+
+            // ================================================================
+            // FETCH CONTAINER ID FROM API
+            // ================================================================
+            // This returns the hostname of the pod that handled the request
+            // WHY display this?
+            // - Demonstrates load balancing across multiple replicas
+            // - Each refresh may show a different container ID
+
+            fetch("/api/id")
+                .then((res) => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res.json();
+                })
+                .then((data) => {
+                    // Display the container/pod hostname
+                    const containerElement =
+                        document.getElementById("container-id");
+                    containerElement.innerText = data.id;
+                    containerElement.classList.remove("loading");
+                })
+                .catch((error) => {
+                    console.error("Error fetching container ID:", error);
+                    const containerElement =
+                        document.getElementById("container-id");
+                    containerElement.innerText = "Error";
+                    containerElement.classList.add("error");
+                });
+        </script>
+    </body>
+</html>

@@ -1,0 +1,113 @@
+# Kubernetes ConfigMap for SVB Webstack
+# ======================================
+# ConfigMaps store non-sensitive configuration data as key-value pairs.
+#
+# WHY CONFIGMAPS?
+# - Separate configuration from container images
+# - Easy to update without rebuilding images
+# - Can be mounted as files or environment variables
+# - Follows 12-Factor App methodology
+#
+# USAGE:
+#   kubectl apply -f configmap.yaml -n svb-webstack
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: svb-backend-config
+    namespace: svb-webstack
+    labels:
+        app.kubernetes.io/name: svb-webstack
+        app.kubernetes.io/component: backend
+data:
+    # Database connection configuration
+    # WHY these values?
+    # - DB_HOST: Kubernetes service name (DNS resolution within cluster)
+    # - DB_PORT: PostgreSQL default port
+    # - DB_NAME: Must match the database created in the Secret
+    DB_HOST: "svb-database"
+    DB_PORT: "5432"
+    DB_NAME: "webstack"
+
+---
+# ConfigMap for Frontend Nginx configuration
+# This allows updating nginx.conf without rebuilding the image
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: svb-frontend-nginx-config
+    namespace: svb-webstack
+    labels:
+        app.kubernetes.io/name: svb-webstack
+        app.kubernetes.io/component: frontend
+data:
+    # The entire nginx.conf is stored here
+    # WHY store as ConfigMap?
+    # - Can update proxy settings without rebuilding image
+    # - Different configs for different environments
+    default.conf: |
+        server {
+            listen 80;
+            server_name _;
+
+            location / {
+                root /usr/share/nginx/html;
+                index index.html;
+                try_files $uri $uri/ /index.html;
+            }
+
+            # Proxy API requests to backend service
+            # Note: svb-backend is the Kubernetes service name
+            location /api/ {
+                proxy_pass http://svb-backend:8000;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_connect_timeout 60s;
+                proxy_send_timeout 60s;
+                proxy_read_timeout 60s;
+            }
+
+            location /health {
+                return 200 'Frontend OK\n';
+                add_header Content-Type text/plain;
+            }
+        }
+
+---
+# ==============================================================================
+# DATABASE INIT SCRIPTS CONFIGMAP
+# ==============================================================================
+# Contains SQL scripts to initialize the database schema
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: svb-db-init-scripts
+    namespace: svb-webstack
+    labels:
+        app.kubernetes.io/name: svb-webstack
+        app.kubernetes.io/component: database
+data:
+    # Init script that creates tables and inserts default data
+    # WHY as ConfigMap?
+    # - Easy to update without rebuilding images
+    # - PostgreSQL runs scripts from /docker-entrypoint-initdb.d/ on first start
+    init.sql: |
+        -- SVB Webstack Database Initialization
+        -- This script runs automatically on first PostgreSQL startup
+
+        -- Create settings table
+        CREATE TABLE IF NOT EXISTS settings (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL
+        );
+
+        -- Insert default value (your initials)
+        INSERT INTO settings (name) VALUES ('SVB')
+        ON CONFLICT DO NOTHING;
+
+        -- Log success
+        DO $$ BEGIN RAISE NOTICE 'SVB Webstack database initialized!'; END $$;

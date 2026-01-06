@@ -1,0 +1,223 @@
+# Kubernetes PostgreSQL Database Deployment
+# ==========================================
+# This file defines all resources needed to run PostgreSQL in Kubernetes.
+#
+# RESOURCES DEFINED:
+# 1. PersistentVolumeClaim (PVC) - Storage for database data
+# 2. StatefulSet - Manages the PostgreSQL pod with stable identity
+# 3. Service - Network endpoint for database access
+#
+# WHY STATEFULSET INSTEAD OF DEPLOYMENT?
+# - Stable, unique network identifiers
+# - Stable, persistent storage
+# - Ordered, graceful deployment and scaling
+# - Required for databases that need consistent identity
+#
+# USAGE:
+#   kubectl apply -f database.yaml -n svb-webstack
+
+---
+# ==============================================================================
+# PERSISTENT VOLUME CLAIM
+# ==============================================================================
+# PVC requests storage from the cluster's storage system
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+    name: svb-database-pvc
+    namespace: svb-webstack
+    labels:
+        app.kubernetes.io/name: svb-webstack
+        app.kubernetes.io/component: database
+spec:
+    # AccessModes define how the volume can be mounted
+    # WHY ReadWriteOnce?
+    # - RWO: Can be mounted read-write by a single node
+    # - Databases typically need exclusive access
+    # - Most storage classes support this mode
+    accessModes:
+        - ReadWriteOnce
+
+    # Storage request
+    # WHY 1Gi?
+    # - Sufficient for development/demo purposes
+    # - Increase for production workloads
+    resources:
+        requests:
+            storage: 1Gi
+
+    # StorageClass (optional)
+    # WHY standard?
+    # - 'standard' is the default StorageClass in most clusters
+    # - kind uses 'standard' by default
+    # - Remove or change for different environments
+    storageClassName: standard
+
+---
+# ==============================================================================
+# STATEFULSET
+# ==============================================================================
+# StatefulSet manages pods with persistent identity
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+    name: svb-database
+    namespace: svb-webstack
+    labels:
+        app.kubernetes.io/name: svb-webstack
+        app.kubernetes.io/component: database
+spec:
+    # Service name for network identity
+    # WHY serviceName?
+    # - Creates DNS entries: svb-database-0.svb-database.svb-webstack.svc.cluster.local
+    # - Provides stable network identity
+    serviceName: svb-database
+
+    # Single replica for database
+    # WHY 1 replica?
+    # - PostgreSQL requires special handling for replication
+    # - For HA, use PostgreSQL operator or managed database
+    replicas: 1
+
+    # Selector must match template labels
+    selector:
+        matchLabels:
+            app.kubernetes.io/name: svb-webstack
+            app.kubernetes.io/component: database
+
+    template:
+        metadata:
+            labels:
+                app.kubernetes.io/name: svb-webstack
+                app.kubernetes.io/component: database
+        spec:
+            containers:
+                - name: postgres
+                  # Official PostgreSQL image
+                  image: postgres:15-alpine
+
+                  # Container ports
+                  ports:
+                      - containerPort: 5432
+                        name: postgres
+
+                  # Environment variables from Secret
+                  # WHY envFrom?
+                  # - Loads all keys from Secret as environment variables
+                  # - Cleaner than listing each variable individually
+                  envFrom:
+                      - secretRef:
+                            name: svb-db-credentials
+
+                  # Volume mount for persistent data
+                  volumeMounts:
+                      - name: postgres-data
+                        mountPath: /var/lib/postgresql/data
+                        # subPath prevents the volume from being empty on first mount
+                        # WHY subPath?
+                        # - PostgreSQL expects an empty directory
+                        # - Some PVs have lost+found directory
+                        # - subPath creates a subdirectory for data
+                        subPath: pgdata
+                      # Mount init scripts for first-time initialization
+                      # WHY /docker-entrypoint-initdb.d/?
+                      # - PostgreSQL image runs .sql files from here on first start
+                      # - Creates tables and inserts default data
+                      - name: init-scripts
+                        mountPath: /docker-entrypoint-initdb.d
+
+                  # Resource limits and requests
+                  # WHY set resources?
+                  # - Helps Kubernetes schedule pods appropriately
+                  # - Prevents resource starvation
+                  # - Required for production workloads
+                  resources:
+                      requests:
+                          memory: "128Mi"
+                          cpu: "100m"
+                      limits:
+                          memory: "512Mi"
+                          cpu: "500m"
+
+                  # Liveness probe - Is the container alive?
+                  # WHY livenessProbe?
+                  # - Kubernetes restarts the container if this fails
+                  # - Detects deadlocks and unresponsive processes
+                  livenessProbe:
+                      exec:
+                          command:
+                              - pg_isready
+                              - -U
+                              - postgres
+                              - -d
+                              - webstack
+                      initialDelaySeconds: 30
+                      periodSeconds: 10
+                      timeoutSeconds: 5
+                      failureThreshold: 3
+
+                  # Readiness probe - Is the container ready to serve traffic?
+                  # WHY readinessProbe?
+                  # - Kubernetes only sends traffic when this passes
+                  # - Important during startup and recovery
+                  readinessProbe:
+                      exec:
+                          command:
+                              - pg_isready
+                              - -U
+                              - postgres
+                              - -d
+                              - webstack
+                      initialDelaySeconds: 5
+                      periodSeconds: 5
+                      timeoutSeconds: 3
+                      failureThreshold: 3
+
+            # Volumes
+            volumes:
+                # Persistent storage from PVC
+                - name: postgres-data
+                  persistentVolumeClaim:
+                      claimName: svb-database-pvc
+                # Init scripts from ConfigMap
+                # WHY ConfigMap for init scripts?
+                # - Easy to update without rebuilding images
+                # - Version controlled with other K8s manifests
+                - name: init-scripts
+                  configMap:
+                      name: svb-db-init-scripts
+
+---
+# ==============================================================================
+# SERVICE
+# ==============================================================================
+# Service provides stable network endpoint for the database
+
+apiVersion: v1
+kind: Service
+metadata:
+    name: svb-database
+    namespace: svb-webstack
+    labels:
+        app.kubernetes.io/name: svb-webstack
+        app.kubernetes.io/component: database
+spec:
+    # ClusterIP - internal only
+    # WHY ClusterIP?
+    # - Database should not be exposed outside the cluster
+    # - Only backend pods need to connect
+    type: ClusterIP
+
+    # Selector matches StatefulSet pods
+    selector:
+        app.kubernetes.io/name: svb-webstack
+        app.kubernetes.io/component: database
+
+    # Port configuration
+    ports:
+        - port: 5432 # Service port (what clients connect to)
+          targetPort: 5432 # Container port (where traffic is sent)
+          protocol: TCP
+          name: postgres

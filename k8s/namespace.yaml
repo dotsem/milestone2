@@ -1,0 +1,25 @@
+# Kubernetes Namespace for SVB Webstack
+# ======================================
+# A namespace isolates our resources from other applications in the cluster.
+#
+# WHY A NAMESPACE?
+# - Organizes resources logically
+# - Provides resource quotas and limits per namespace
+# - Enables RBAC (Role-Based Access Control) per namespace
+# - Makes cleanup easier (delete namespace = delete everything in it)
+#
+# USAGE:
+#   kubectl apply -f namespace.yaml
+#   kubectl get all -n svb-webstack
+
+apiVersion: v1
+kind: Namespace
+metadata:
+    name: svb-webstack
+    labels:
+        # Labels help identify and select resources
+        # WHY labels?
+        # - Used by selectors to find related resources
+        # - Useful for monitoring and logging
+        app.kubernetes.io/name: svb-webstack
+        app.kubernetes.io/managed-by: kubectl

@@ -1,0 +1,133 @@
+# Kubernetes Nginx Frontend Deployment
+# =====================================
+# This file defines all resources needed to run the Nginx frontend.
+#
+# RESOURCES DEFINED:
+# 1. Deployment - Manages frontend pods
+# 2. Service - Network endpoint for frontend access
+#
+# USAGE:
+#   kubectl apply -f frontend.yaml -n svb-webstack
+
+---
+# ==============================================================================
+# DEPLOYMENT
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: svb-frontend
+    namespace: svb-webstack
+    labels:
+        app.kubernetes.io/name: svb-webstack
+        app.kubernetes.io/component: frontend
+spec:
+    # Single replica for frontend
+    # WHY 1 replica?
+    # - Static content, less critical than backend
+    # - Can increase for high availability
+    replicas: 1
+
+    selector:
+        matchLabels:
+            app.kubernetes.io/name: svb-webstack
+            app.kubernetes.io/component: frontend
+
+    strategy:
+        type: RollingUpdate
+        rollingUpdate:
+            maxSurge: 1
+            maxUnavailable: 0
+
+    template:
+        metadata:
+            labels:
+                app.kubernetes.io/name: svb-webstack
+                app.kubernetes.io/component: frontend
+        spec:
+            containers:
+                - name: frontend
+                  # Image built from frontend/Dockerfile
+                  image: svb-frontend:latest
+                  imagePullPolicy: Never
+
+                  ports:
+                      - containerPort: 80
+                        name: http
+
+                  # Mount ConfigMap as nginx configuration
+                  # WHY mount as volume?
+                  # - Can update nginx.conf without rebuilding image
+                  # - ConfigMap overrides the file in the container
+                  volumeMounts:
+                      - name: nginx-config
+                        mountPath: /etc/nginx/conf.d/default.conf
+                        subPath: default.conf
+
+                  # Resource limits
+                  resources:
+                      requests:
+                          memory: "64Mi"
+                          cpu: "50m"
+                      limits:
+                          memory: "128Mi"
+                          cpu: "200m"
+
+                  # Liveness probe
+                  livenessProbe:
+                      httpGet:
+                          path: /health
+                          port: 80
+                      initialDelaySeconds: 5
+                      periodSeconds: 10
+                      timeoutSeconds: 3
+                      failureThreshold: 3
+
+                  # Readiness probe
+                  readinessProbe:
+                      httpGet:
+                          path: /health
+                          port: 80
+                      initialDelaySeconds: 3
+                      periodSeconds: 5
+                      timeoutSeconds: 3
+                      failureThreshold: 3
+
+            # Volume from ConfigMap
+            volumes:
+                - name: nginx-config
+                  configMap:
+                      name: svb-frontend-nginx-config
+
+---
+# ==============================================================================
+# SERVICE
+# ==============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+    name: svb-frontend
+    namespace: svb-webstack
+    labels:
+        app.kubernetes.io/name: svb-webstack
+        app.kubernetes.io/component: frontend
+spec:
+    # NodePort for external access (alternative to Ingress)
+    # WHY NodePort?
+    # - Allows access from outside the cluster
+    # - Works without Ingress controller
+    # - Port 30080 is accessible on any node
+    type: NodePort
+
+    selector:
+        app.kubernetes.io/name: svb-webstack
+        app.kubernetes.io/component: frontend
+
+    ports:
+        - port: 80
+          targetPort: 80
+          nodePort: 30080 # Fixed port for easy access
+          protocol: TCP
+          name: http
