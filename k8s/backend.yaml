@@ -140,6 +140,8 @@ metadata:
     labels:
         app.kubernetes.io/name: svb-webstack
         app.kubernetes.io/component: backend
+    annotations:
+        traefik.ingress.kubernetes.io/service.serverstransport: svb-webstack-svb-backend-transport@kubernetescrd
 spec:
     # ClusterIP for internal access
     # WHY ClusterIP?
