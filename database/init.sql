@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 -- Insert default value (your initials as default name)
-INSERT INTO settings (name) VALUES ('SVB')
+INSERT INTO settings (name) VALUES ('Sem Van Broekhoven')
 ON CONFLICT DO NOTHING;
 
 -- Optional: Create an index for faster lookups (not needed for single row, but good practice)
