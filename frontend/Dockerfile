@@ -28,6 +28,7 @@ FROM nginx:1.25-alpine
 # - This is Nginx's default document root
 # - The default nginx.conf serves files from this directory
 COPY index.html /usr/share/nginx/html/index.html
+COPY assets /usr/share/nginx/html/assets
 
 # ==============================================================================
 # COPY CUSTOM NGINX CONFIGURATION
