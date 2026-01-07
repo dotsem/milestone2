@@ -1,3 +1,4 @@
 prompt.txt
 .env
 secrets.yaml
+duckdns-secret.yaml

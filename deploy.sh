@@ -69,6 +69,10 @@ else
     echo -e "${BLUE}Installing Traefik CRDs...${NC}"
     kubectl apply -f https://raw.githubusercontent.com/traefik/traefik/v3.0/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml
 
+    # Apply DuckDNS secret BEFORE Traefik (Traefik needs it to start)
+    echo -e "${BLUE}Creating DuckDNS secret for ACME...${NC}"
+    kubectl apply -f k8s/duckdns-secret.yaml
+
     # Install Traefik
     echo -e "${BLUE}Installing Traefik...${NC}"
     kubectl apply -f k8s/traefik.yaml
@@ -131,6 +135,7 @@ kubectl apply -f k8s/namespace.yaml
 
 echo -e "${BLUE}Creating secrets and configmaps...${NC}"
 kubectl apply -f k8s/secrets.yaml
+kubectl apply -f k8s/duckdns-secret.yaml
 kubectl apply -f k8s/configmap.yaml
 
 echo -e "${BLUE}Deploying database...${NC}"

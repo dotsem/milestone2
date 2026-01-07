@@ -32,24 +32,23 @@ metadata:
         # - 'traefik' for Traefik Ingress Controller
         kubernetes.io/ingress.class: traefik
 
-        # Traefik doesn't use nginx.* annotations.
-        # Rewrites would require Middleware CRDs, but no rewrites are needed here.
+        # Traefik entrypoints - enable both HTTP (web) and HTTPS (websecure)
+        traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
     # Ingress class name (Kubernetes 1.18+)
     ingressClassName: traefik
 
+    # NOTE: TLS section removed - Traefik serves HTTPS with default certificate
+    # For custom certificates, add back tls section with secretName
+
     # Routing rules
     rules:
-        # Host-based routing (optional)
-        # WHY no host?
-        # - Matches any hostname (useful for local development)
-        # - Add host: example.com for production
-        - http:
+        # Rule 1: DuckDNS domain with TLS
+        # REPLACE with your DuckDNS domain
+        - host: svb-milestone2.duckdns.org
+          http:
               paths:
                   # API routes to backend
-                  # WHY /api prefix?
-                  # - Clear separation between frontend and backend
-                  # - Matches what the frontend JavaScript expects
                   - path: /api
                     pathType: Prefix
                     backend:
@@ -59,9 +58,6 @@ spec:
                                 number: 8000
 
                   # All other routes to frontend
-                  # WHY / last?
-                  # - More specific paths (/api) should come first
-                  # - / is a catch-all for everything else
                   - path: /
                     pathType: Prefix
                     backend:
@@ -70,46 +66,91 @@ spec:
                             port:
                                 number: 80
 
+        # Rule 2: Localhost fallback (no host restriction)
+        # WHY this rule?
+        # - Allows access via localhost for local development
+        # - Still works even if DuckDNS domain isn't pointing here yet
+        - http:
+              paths:
+                  - path: /api
+                    pathType: Prefix
+                    backend:
+                        service:
+                            name: svb-backend
+                            port:
+                                number: 8000
+
+                  - path: /
+                    pathType: Prefix
+                    backend:
+                        service:
+                            name: svb-frontend
+                            port:
+                                number: 80
+
+
+# ==============================================================================
+# HTTPS INGRESS
+# ==============================================================================
+# Separate ingress for HTTPS traffic
+# Uses Traefik's default self-signed certificate
+
 ---
-# ==============================================================================
-# INGRESS WITH TLS (Optional - for HTTPS extra points)
-# ==============================================================================
-# Uncomment this section after setting up cert-manager
-#
-# Prerequisites for HTTPS:
-# 1. Install cert-manager: kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.2/cert-manager.yaml
-# 2. Create a ClusterIssuer (see cert-manager-issuer.yaml)
-# 3. Have a valid domain pointing to your cluster
-#
-# apiVersion: networking.k8s.io/v1
-# kind: Ingress
-# metadata:
-#   name: svb-ingress-tls
-#   namespace: svb-webstack
-#   annotations:
-#     kubernetes.io/ingress.class: nginx
-#     cert-manager.io/cluster-issuer: letsencrypt-prod
-# spec:
-#   ingressClassName: nginx
-#   tls:
-#     - hosts:
-#         - your-domain.com
-#       secretName: svb-tls-secret
-#   rules:
-#     - host: your-domain.com
-#       http:
-#         paths:
-#           - path: /api
-#             pathType: Prefix
-#             backend:
-#               service:
-#                 name: svb-backend
-#                 port:
-#                   number: 8000
-#           - path: /
-#             pathType: Prefix
-#             backend:
-#               service:
-#                 name: svb-frontend
-#                 port:
-#                   number: 80
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+    name: svb-ingress-https
+    namespace: svb-webstack
+    labels:
+        app.kubernetes.io/name: svb-webstack
+        app.kubernetes.io/component: ingress-https
+    annotations:
+        kubernetes.io/ingress.class: traefik
+        # Enable TLS on the websecure entrypoint
+        traefik.ingress.kubernetes.io/router.entrypoints: websecure
+        traefik.ingress.kubernetes.io/router.tls: "true"
+        # Use Let's Encrypt certificate resolver
+        traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+spec:
+    ingressClassName: traefik
+
+    # Routing rules for HTTPS
+    rules:
+        # Localhost fallback for HTTPS
+        - http:
+              paths:
+                  - path: /api
+                    pathType: Prefix
+                    backend:
+                        service:
+                            name: svb-backend
+                            port:
+                                number: 8000
+
+                  - path: /
+                    pathType: Prefix
+                    backend:
+                        service:
+                            name: svb-frontend
+                            port:
+                                number: 80
+
+        # DuckDNS domain for HTTPS
+        - host: svb-milestone2.duckdns.org
+          http:
+              paths:
+                  - path: /api
+                    pathType: Prefix
+                    backend:
+                        service:
+                            name: svb-backend
+                            port:
+                                number: 8000
+
+                  - path: /
+                    pathType: Prefix
+                    backend:
+                        service:
+                            name: svb-frontend
+                            port:
+                                number: 80

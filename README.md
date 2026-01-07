@@ -105,6 +105,49 @@ kubectl wait --namespace svb-webstack \
 kubectl get all -n svb-webstack
 ```
 
+## 🔒 HTTPS with DuckDNS (Optional +2 points)
+
+Enable HTTPS using Traefik's automatic Let's Encrypt integration via DuckDNS:
+
+### Prerequisites
+1. Create a free domain at [DuckDNS](https://www.duckdns.org/)
+2. Get your DuckDNS token from the dashboard
+
+### Configuration Steps
+
+```bash
+# 1. Edit the DuckDNS secret with your token
+nano k8s/duckdns-secret.yaml
+# Replace YOUR_DUCKDNS_TOKEN_HERE with your actual token
+
+# 2. Edit the ingress with your domain
+nano k8s/ingress.yaml
+# Replace YOUR_DOMAIN.duckdns.org with your actual domain (2 places)
+
+# 3. (Optional) Update email in traefik.yaml
+nano k8s/traefik.yaml
+# Replace your-email@example.com with your email
+
+# 4. Apply the secret and redeploy
+kubectl apply -f k8s/duckdns-secret.yaml
+kubectl rollout restart deployment traefik -n kube-system
+kubectl apply -f k8s/ingress.yaml -n svb-webstack
+
+# 5. Point your DuckDNS domain to your local IP
+# On DuckDNS dashboard or via API:
+curl "https://www.duckdns.org/update?domains=YOUR_DOMAIN&token=YOUR_TOKEN&ip="
+```
+
+### Testing HTTPS
+
+```bash
+# Test with curl (staging certs need -k flag)
+curl -k https://YOUR_DOMAIN.duckdns.org/api/health
+
+# For production certs, remove the caserver line in traefik.yaml
+# Then certificates will be trusted by browsers
+```
+
 ## 📊 Architecture
 
 ```
@@ -195,7 +238,7 @@ kubectl get pods -n svb-webstack -o wide
 | Kind cluster with 1 worker | 10 | ✅ kind-config.yaml |
 | Extra worker + scaling via Ingress | +1 | ✅ 2 workers configured |
 | Health check auto-restart | +1 | ✅ Liveness/readiness probes |
-| HTTPS with cert-manager | +2 | 📝 Template in ingress.yaml |
+| HTTPS with Traefik/DuckDNS | +2 | ✅ Configured in traefik.yaml + ingress.yaml |
 | Prometheus monitoring | +2 | ⬜ Not yet implemented |
 | Kubeadm OR ArgoCD | +4 | ⬜ Not yet implemented |
 

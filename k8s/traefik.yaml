@@ -84,6 +84,8 @@ metadata:
         app: traefik
 spec:
     replicas: 1
+    strategy:
+        type: Recreate
     selector:
         matchLabels:
             app: traefik
@@ -115,6 +117,26 @@ spec:
                       - --entrypoints.websecure.address=:443
                       - --providers.kubernetesingress
                       - --providers.kubernetesingress.ingressclass=traefik
+                      # ACME/Let's Encrypt configuration for DuckDNS
+                      - --certificatesresolvers.letsencrypt.acme.email=svb-milestone2@duckdns.org
+                      - --certificatesresolvers.letsencrypt.acme.storage=/acme/acme.json
+                      - --certificatesresolvers.letsencrypt.acme.dnschallenge=true
+                      - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=duckdns
+                      - --certificatesresolvers.letsencrypt.acme.dnschallenge.delaybeforecheck=120
+                      # Use authoritative DNS servers to avoid SERVFAIL with DuckDNS
+                      - --certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
+                      - --certificatesresolvers.letsencrypt.acme.dnschallenge.disablepropagationcheck=true
+                      # Use Let's Encrypt Production
+                      - --certificatesresolvers.letsencrypt.acme.caserver=https://acme-v02.api.letsencrypt.org/directory
+                  env:
+                      - name: DUCKDNS_TOKEN
+                        valueFrom:
+                            secretKeyRef:
+                                name: duckdns-secret
+                                key: token
+                  volumeMounts:
+                      - name: acme-storage
+                        mountPath: /acme
                   ports:
                       - name: web
                         containerPort: 80
@@ -128,6 +150,9 @@ spec:
                               - ALL
                           add:
                               - NET_BIND_SERVICE
+            volumes:
+                - name: acme-storage
+                  emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
