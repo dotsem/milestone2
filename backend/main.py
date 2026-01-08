@@ -19,6 +19,7 @@ import socket
 import asyncpg
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
@@ -106,6 +107,9 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Instrument the app object to expose Prometheus metrics
+Instrumentator().instrument(app).expose(app)
 
 # ==============================================================================
 # CORS MIDDLEWARE

@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: svb-backend
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: svb-webstack
+      app.kubernetes.io/component: backend
+  namespaceSelector:
+    matchNames:
+      - svb-webstack
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s

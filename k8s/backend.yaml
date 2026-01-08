@@ -56,6 +56,10 @@ spec:
             labels:
                 app.kubernetes.io/name: svb-webstack
                 app.kubernetes.io/component: backend
+            annotations:
+                prometheus.io/scrape: "true"
+                prometheus.io/port: "8000"
+                prometheus.io/path: "/metrics"
         spec:
             containers:
                 - name: backend
