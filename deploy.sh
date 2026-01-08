@@ -57,33 +57,36 @@ echo -e "${GREEN}✓ kubectl context set to kind-${CLUSTER_NAME}${NC}"
 echo ""
 
 # ==============================================================================
-# STEP 2: Install Traefik Ingress Controller
+# STEP 2: Install ArgoCD (GitOps)
 # ==============================================================================
-echo -e "${YELLOW}[Step 2/6] Installing Traefik Ingress Controller...${NC}"
+echo -e "${YELLOW}[Step 2/6] Installing ArgoCD...${NC}"
 
-# Check if traefik is running
-if kubectl get deployment traefik -n kube-system > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ Traefik Ingress Controller already installed${NC}"
+# Add Argo Helm repo
+echo -e "${BLUE}Adding Argo Helm repository...${NC}"
+helm repo add argo https://argoproj.github.io/argo-helm > /dev/null 2>&1
+helm repo update > /dev/null 2>&1
+
+# Install ArgoCD via Helm
+if kubectl get deployment argocd-server -n argocd > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ ArgoCD already installed${NC}"
 else
-    # Install CRDs
-    echo -e "${BLUE}Installing Traefik CRDs...${NC}"
-    kubectl apply -f https://raw.githubusercontent.com/traefik/traefik/v3.0/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml
+    echo -e "${BLUE}Installing ArgoCD (this may take a minute)...${NC}"
+    helm install argocd argo/argo-cd \
+        --namespace argocd \
+        --create-namespace \
+        --set server.service.type=ClusterIP \
+        --wait
 
-    # Apply DuckDNS secret BEFORE Traefik (Traefik needs it to start)
-    echo -e "${BLUE}Creating DuckDNS secret for ACME...${NC}"
-    kubectl apply -f k8s/duckdns-secret.yaml
-
-    # Install Traefik
-    echo -e "${BLUE}Installing Traefik...${NC}"
-    kubectl apply -f k8s/traefik.yaml
-    
-    echo -e "${YELLOW}Waiting for Traefik to be ready...${NC}"
-    kubectl wait --namespace kube-system \
-        --for=condition=ready pod \
-        --selector=app=traefik \
-        --timeout=120s
-    echo -e "${GREEN}✓ Traefik ready${NC}"
+    echo -e "${GREEN}✓ ArgoCD installation complete${NC}"
 fi
+
+# Wait for ArgoCD server
+echo -e "${YELLOW}Waiting for ArgoCD server to be ready...${NC}"
+kubectl wait --namespace argocd \
+    --for=condition=ready pod \
+    --selector=app.kubernetes.io/name=argocd-server \
+    --timeout=300s
+echo -e "${GREEN}✓ ArgoCD server ready${NC}"
 echo ""
 
 # ==============================================================================
@@ -119,38 +122,19 @@ echo -e "${GREEN}✓ Images loaded into cluster${NC}"
 echo ""
 
 # ==============================================================================
-# STEP 5: Apply Kubernetes Manifests
+# STEP 5: Apply ArgoCD Application
 # ==============================================================================
-echo -e "${YELLOW}[Step 5/6] Applying Kubernetes manifests...${NC}"
+echo -e "${YELLOW}[Step 5/6] Deploying via ArgoCD...${NC}"
 
-# Apply in order (dependencies first)
-# WHY this order?
-# - Namespace must exist before other resources
-# - Secrets and ConfigMaps before Deployments (referenced by pods)
-# - Database before backend (backend depends on database)
-# - Frontend and Ingress last
+# Ensure CRDs are applied (ArgoCD might have trouble with CRDs in the same sync initially or if they are large)
+echo -e "${BLUE}Applying Traefik CRDs manually (best practice for CRDs)...${NC}"
+kubectl apply -f k8s/traefik-crds.yaml
 
-echo -e "${BLUE}Creating namespace...${NC}"
-kubectl apply -f k8s/namespace.yaml
+echo -e "${BLUE}Applying ArgoCD Application manifest...${NC}"
+kubectl apply -f argocd/application.yaml
 
-echo -e "${BLUE}Creating secrets and configmaps...${NC}"
-kubectl apply -f k8s/secrets.yaml
-kubectl apply -f k8s/duckdns-secret.yaml
-kubectl apply -f k8s/configmap.yaml
-
-echo -e "${BLUE}Deploying database...${NC}"
-kubectl apply -f k8s/database.yaml
-
-echo -e "${BLUE}Deploying backend...${NC}"
-kubectl apply -f k8s/backend.yaml
-
-echo -e "${BLUE}Deploying frontend...${NC}"
-kubectl apply -f k8s/frontend.yaml
-
-echo -e "${BLUE}Creating ingress...${NC}"
-kubectl apply -f k8s/ingress.yaml
-
-echo -e "${GREEN}✓ All manifests applied${NC}"
+echo -e "${GREEN}✓ ArgoCD Application applied${NC}"
+echo -e "${YELLOW}ArgoCD will now sync the repository instructions...${NC}"
 echo ""
 
 # ==============================================================================
