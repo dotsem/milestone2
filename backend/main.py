@@ -12,7 +12,6 @@
 # - GET /api/user  : Returns the user name from the database.
 # - GET /api/id    : Returns the container/pod hostname (for load balancing demo).
 # - GET /api/health: Health check endpoint for Kubernetes probes.
-# - PUT /api/user  : Updates the user name in the database.
 
 import os
 import socket
@@ -204,20 +203,3 @@ async def health_check():
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Unhealthy: {str(e)}")
-
-
-@app.put("/api/user", response_model=UserResponse)
-async def update_user(user: UserUpdate):
-    """
-    PUT /api/user
-    Updates the user name in the database.
-
-    This allows changing the name without direct database access.
-    Useful for demonstration purposes.
-    """
-    async with pool.acquire() as conn:
-        await conn.execute(
-            "UPDATE settings SET name = $1 WHERE id = 1",
-            user.name
-        )
-        return {"name": user.name}
