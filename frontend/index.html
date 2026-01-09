@@ -86,11 +86,22 @@
                 <span class="label">Container ID:</span>
                 <span id="container-id" class="value loading">Loading...</span>
             </div>
+            <div class="info">
+                <span class="label">Health:</span>
+                <span id="health" class="value loading">Loading...</span>
+            </div>
+            <div class="info">
+                <form action="/api/user" method="put">
+                    <input type="text" name="name" id="name" />
+                    <button type="submit">Update Name</button>
+                </form>
+            </div>
         </div>
 
         <script>
             const userElement = document.getElementById("user");
             const containerElement = document.getElementById("container-id");
+            const healthElement = document.getElementById("health");
             const title = "Milestone 2";
 
             fetch("/api/user")
@@ -122,6 +133,19 @@
                     console.error("Error fetching container ID:", error);
                     containerElement.innerText = "Error";
                     containerElement.classList.add("error");
+                });
+            fetch("/api/health")
+                .then((res) => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res.json();
+                })
+                .then((data) => {
+                    healthElement.innerText = data.status;
+                    healthElement.classList.remove("loading");
+                })
+                .catch((error) => {
+                    healthElement.innerText = "Error";
+                    healthElement.classList.add("error");
                 });
         </script>
     </body>
