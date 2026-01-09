@@ -41,7 +41,7 @@
                 background: rgba(216, 209, 187, 0.1);
                 backdrop-filter: blur(10px);
                 border-radius: 20px;
-                padding: 40px;
+                padding: 16px 32px;
                 box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
             }
             h1 {
@@ -86,15 +86,17 @@
                 <span class="label">Container ID:</span>
                 <span id="container-id" class="value loading">Loading...</span>
             </div>
-            <div class="info">
-                <span class="label">Health:</span>
-                <span id="health" class="value loading">Loading...</span>
-            </div>
-            <div class="info">
-                <form action="/api/user" method="put">
-                    <input type="text" name="name" id="name" />
-                    <button type="submit">Update Name</button>
-                </form>
+            <div
+                class="info"
+                style="display: flex; justify-content: space-between">
+                <div>
+                    <span class="label">Health:</span>
+                    <span id="health" class="value loading">Loading...</span>
+                </div>
+                <div>
+                    <span class="label">Database:</span>
+                    <span id="database" class="value loading">Loading...</span>
+                </div>
             </div>
         </div>
 
@@ -102,6 +104,7 @@
             const userElement = document.getElementById("user");
             const containerElement = document.getElementById("container-id");
             const healthElement = document.getElementById("health");
+            const databaseElement = document.getElementById("database");
             const title = "Milestone 2";
 
             fetch("/api/user")
@@ -142,6 +145,8 @@
                 .then((data) => {
                     healthElement.innerText = data.status;
                     healthElement.classList.remove("loading");
+                    databaseElement.innerText = data.database;
+                    databaseElement.classList.remove("loading");
                 })
                 .catch((error) => {
                     healthElement.innerText = "Error";
