@@ -1,154 +1,68 @@
-# Docker Compose for Kubernetes Webstack
-# =======================================
-# This file defines the complete 3-tier application stack for local development
-# and Docker-only deployment (worth 5/20 points according to the assignment).
-#
-# USAGE:
-#   docker-compose up --build        # Build and start all services
-#   docker-compose up -d             # Start in detached mode (background)
-#   docker-compose down              # Stop and remove containers
-#   docker-compose logs -f           # Follow logs from all services
-#
-# WHY DOCKER COMPOSE?
-# - Defines multi-container applications in a single file
-# - Handles networking between containers automatically
-# - Easy to start/stop the entire stack
-# - Perfect for local development before deploying to Kubernetes
-
-# ==============================================================================
-# COMPOSE FILE VERSION
-# ==============================================================================
-# Version 3.8 is the latest stable version with all features we need
-# Note: 'version' is optional in newer Docker Compose versions but included
-# for compatibility with older versions
-
-version: "3.8"
-
-# ==============================================================================
-# SERVICES
-# ==============================================================================
-# Each service represents a container in our stack
-
 services:
-  # ============================================================================
-  # DATABASE SERVICE (PostgreSQL)
-  # ============================================================================
-  # PostgreSQL is our backend database storing the user name
-  # 
-  # WHY PostgreSQL?
-  # - Robust, production-ready relational database
-  # - Great for structured data
-  # - Widely used in production environments
-  
+  # container voor postgreSQL database
   svb-database:
-    # Official PostgreSQL image with Alpine Linux for smaller size
+    # kleine image voor postgreSQL
     image: postgres:15-alpine
     
-    # Container name for easier identification
-    # WHY svb- prefix?
-    # - Assignment requirement: "Use your initials for image, container names"
     container_name: svb-database
     
-    # Environment variables for PostgreSQL configuration
-    # WHY environment variables?
-    # - Standard way to configure containers
-    # - Easy to change without modifying images
-    # - Can be overridden at runtime
+    # aangezien we docker niet gebruiken als "productie" en puur om te testen is het makkelijker om de env vars te hardcoden
+    # dit is natuurlijk geen goede praktijk maar voor een testomgeving is het makkelijker
     environment:
-      # These create the initial database and user
-      POSTGRES_DB: webstack        # Database name
-      POSTGRES_USER: postgres      # Database user
-      POSTGRES_PASSWORD: postgres  # Database password (use secrets in production!)
+      POSTGRES_DB: webstack        
+      POSTGRES_USER: postgres    
+      POSTGRES_PASSWORD: postgres # "password = password" ahhh
     
-    # Persistent storage for database data
-    # WHY volumes?
-    # - Containers are ephemeral - data is lost when they're removed
-    # - Volumes persist data across container restarts
-    # - Named volumes are managed by Docker
+   
     volumes:
       - svb-db-data:/var/lib/postgresql/data
-      # Mount init script for first-time database initialization
-      # WHY /docker-entrypoint-initdb.d/?
-      # - PostgreSQL image automatically runs .sql files from this directory
-      # - Only runs on first initialization (empty data directory)
-      # - Perfect for creating tables and inserting initial data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     
-    # Health check to ensure database is ready
-    # WHY health check?
-    # - Other services depend on the database
-    # - We need to know when the database is ready to accept connections
-    # - pg_isready is PostgreSQL's built-in readiness check
+    # healthchecks om te testen of alles goed draait, het zelfde princiepe (hoe deze container getest wordt) wordt ook gebruikt in k8s
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d webstack"]
-      interval: 5s      # Check every 5 seconds
-      timeout: 5s       # Timeout after 5 seconds
-      retries: 5        # Retry 5 times before marking as unhealthy
-      start_period: 10s # Wait 10 seconds before first check
+      interval: 5s      
+      timeout: 5s       
+      retries: 5        
+      start_period: 10s 
     
-    # Internal network for service communication
     networks:
       - svb-network
 
-  # ============================================================================
-  # BACKEND SERVICE (FastAPI)
-  # ============================================================================
-  # FastAPI application serving the REST API
-  
+  # FastAPI backend  
   svb-backend:
-    # Build from the backend directory
-    # WHY build instead of image?
-    # - We have custom code that needs to be containerized
-    # - The Dockerfile in ./backend defines how to build it
+    # gebruikt dockerfile
     build:
       context: ./backend
       dockerfile: Dockerfile
     
-    # Tag the built image with our initials
     image: svb-backend:latest
     
     container_name: svb-backend
     
-    # Environment variables for database connection
-    # WHY these variables?
-    # - The FastAPI app reads these to connect to the database
-    # - DB_HOST uses the service name (Docker DNS resolution)
+   # opnieuw, dit is een test omgeving, hipitihopeti
     environment:
-      DB_HOST: svb-database    # Docker resolves this to the database container
-      DB_PORT: "5432"          # PostgreSQL default port
-      DB_NAME: webstack        # Must match POSTGRES_DB above
-      DB_USER: postgres        # Must match POSTGRES_USER above
-      DB_PASSWORD: postgres    # Must match POSTGRES_PASSWORD above
+      DB_HOST: svb-database   
+      DB_PORT: "5432"         
+      DB_NAME: webstack      
+      DB_USER: postgres       
+      DB_PASSWORD: postgres    
     
-    # Port mapping for external access
-    # WHY 8000:8000?
-    # - Left side: host port (accessible from your machine)
-    # - Right side: container port (where the app listens)
+    # expose poort 8000 aan de "buitenwereld"
     ports:
       - "8000:8000"
     
-    # Dependency on database service
-    # WHY depends_on with condition?
-    # - Ensures database is healthy before starting backend
-    # - Without this, the backend might fail to connect on startup
+    # aangezien de backend afhankelijk is van de database moet deze wachten tot de database is opgestart
     depends_on:
       svb-database:
         condition: service_healthy
     
-    # Restart policy
-    # WHY restart: unless-stopped?
-    # - Automatically restart if the container crashes
-    # - Won't restart if manually stopped
     restart: unless-stopped
     
     networks:
       - svb-network
 
-  # ============================================================================
-  # FRONTEND SERVICE (Nginx)
-  # ============================================================================
-  # Nginx web server serving the static HTML/JS frontend
-  
+ # frontend via Nginx webserver
   svb-frontend:
     build:
       context: ./frontend
@@ -158,14 +72,11 @@ services:
     
     container_name: svb-frontend
     
-    # Port mapping for web access
-    # WHY 8080:80?
-    # - 8080 on host (avoids needing root for port 80)
-    # - 80 inside container (Nginx default)
+   # we gebruiken poort 8080 omdat dit een testomgevnig is, zo clutteren we niet de poorten van de host 
     ports:
       - "8080:80"
     
-    # Frontend depends on backend being available
+    # aangezien de frontend afhankelijk is van de backend moet deze wachten tot de backend is opgestart
     depends_on:
       - svb-backend
     
@@ -174,30 +85,13 @@ services:
     networks:
       - svb-network
 
-# ==============================================================================
-# NETWORKS
-# ==============================================================================
-# Custom network for inter-service communication
-
+# we gebruiken een intern netwerk om de containers met elkaar te laten praaten
 networks:
   svb-network:
-    # Bridge driver is the default for single-host networking
-    # WHY custom network?
-    # - Isolates our services from other containers
-    # - Enables DNS resolution between services (by service name)
-    # - Better security than using the default bridge network
     driver: bridge
 
-# ==============================================================================
-# VOLUMES
-# ==============================================================================
-# Named volumes for persistent data storage
+
 
 volumes:
   svb-db-data:
-    # Named volume for PostgreSQL data
-    # WHY named volume instead of bind mount?
-    # - Docker manages the volume location
-    # - Better performance on non-Linux hosts
-    # - Easier to backup and migrate
     driver: local
