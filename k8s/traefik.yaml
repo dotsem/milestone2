@@ -130,6 +130,10 @@ spec:
                       - --certificatesresolvers.letsencrypt.acme.caserver=https://acme-v02.api.letsencrypt.org/directory
                       # Enable Prometheus metrics
                       - --metrics.prometheus=true
+                      # Enable Ping for health checks
+                      - --ping
+                      - --ping.entrypoint=ping
+                      - --entrypoints.ping.address=:8082
                   env:
                       - name: DUCKDNS_TOKEN
                         valueFrom:
@@ -146,6 +150,26 @@ spec:
                         containerPort: 443
                       - name: admin
                         containerPort: 8080
+                      - name: ping
+                        containerPort: 8082
+
+                  livenessProbe:
+                      httpGet:
+                          path: /ping
+                          port: 8082
+                      initialDelaySeconds: 10
+                      periodSeconds: 10
+                      timeoutSeconds: 2
+                      failureThreshold: 3
+
+                  readinessProbe:
+                      httpGet:
+                          path: /ping
+                          port: 8082
+                      initialDelaySeconds: 10
+                      periodSeconds: 10
+                      timeoutSeconds: 2
+                      failureThreshold: 3
                   securityContext:
                       capabilities:
                           drop:
