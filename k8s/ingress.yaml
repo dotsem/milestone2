@@ -1,22 +1,4 @@
-# Kubernetes Ingress for SVB Webstack
-# ====================================
-# Ingress exposes HTTP routes from outside the cluster to services within.
-#
-# WHY INGRESS?
-# - Single entry point for all traffic
-# - Path-based routing (/ -> frontend, /api -> backend)
-# - Can add TLS/HTTPS easily
-# - More flexible than NodePort
-# - Extra points: "scaling of API across nodes using ingress"
-#
-# PREREQUISITES:
-# - NGINX Ingress Controller must be installed
-# - For kind: kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
-#
-# USAGE:
-#   kubectl apply -f ingress.yaml -n svb-webstack
-
----
+# we gebruiken ingress om onze frontend en backend toegankelijk te maken buiten de cluster via een veilige manier.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -26,29 +8,17 @@ metadata:
         app.kubernetes.io/name: svb-webstack
         app.kubernetes.io/component: ingress
     annotations:
-        # Ingress class annotation
-        # WHY kubernetes.io/ingress.class?
-        # - Tells which Ingress controller should handle this
-        # - 'traefik' for Traefik Ingress Controller
+        # we gebruiken traefik als ingress controller
         kubernetes.io/ingress.class: traefik
 
-        # Traefik entrypoints - enable both HTTP (web) and HTTPS (websecure)
         traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
-    # Ingress class name (Kubernetes 1.18+)
     ingressClassName: traefik
-
-    # NOTE: TLS section removed - Traefik serves HTTPS with default certificate
-    # For custom certificates, add back tls section with secretName
-
-    # Routing rules
     rules:
-        # Rule 1: DuckDNS domain with TLS
-        # REPLACE with your DuckDNS domain
+     # ons duckdns domein
         - host: svb-milestone2.duckdns.org
           http:
               paths:
-                  # API routes to backend
                   - path: /api
                     pathType: Prefix
                     backend:
@@ -57,7 +27,6 @@ spec:
                             port:
                                 number: 8000
 
-                  # All other routes to frontend
                   - path: /
                     pathType: Prefix
                     backend:
@@ -66,10 +35,7 @@ spec:
                             port:
                                 number: 80
 
-        # Rule 2: Localhost fallback (no host restriction)
-        # WHY this rule?
-        # - Allows access via localhost for local development
-        # - Still works even if DuckDNS domain isn't pointing here yet
+        # localhost fallback om tests te doen en te werken zonder dat duckdns beschikbaar is
         - http:
               paths:
                   - path: /api
@@ -89,13 +55,8 @@ spec:
                                 number: 80
 
 
-# ==============================================================================
-# HTTPS INGRESS
-# ==============================================================================
-# Separate ingress for HTTPS traffic
-# Uses Traefik's default self-signed certificate
-
 ---
+# ingress voor https connectie
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -106,17 +67,14 @@ metadata:
         app.kubernetes.io/component: ingress-https
     annotations:
         kubernetes.io/ingress.class: traefik
-        # Enable TLS on the websecure entrypoint
         traefik.ingress.kubernetes.io/router.entrypoints: websecure
         traefik.ingress.kubernetes.io/router.tls: "true"
-        # Use Let's Encrypt certificate resolver
-        traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+        traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt # we gebruiken de ingebouwde letsencrupt van traefik
 spec:
     ingressClassName: traefik
 
-    # Routing rules for HTTPS
     rules:
-        # Localhost fallback for HTTPS
+        # localhost fallback voor HTTPS
         - http:
               paths:
                   - path: /api
@@ -135,7 +93,7 @@ spec:
                             port:
                                 number: 80
 
-        # DuckDNS domain for HTTPS
+        # duckdns domain voor HTTPS
         - host: svb-milestone2.duckdns.org
           http:
               paths:

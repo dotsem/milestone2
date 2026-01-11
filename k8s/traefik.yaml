@@ -1,3 +1,4 @@
+# dit is de configuratie voor traefik
 apiVersion: networking.k8s.io/v1
 kind: IngressClass
 metadata:
@@ -95,8 +96,6 @@ spec:
                 app: traefik
         spec:
             serviceAccountName: traefik-ingress-controller
-            # hostNetwork: true allows the pod to listen on port 80/443 of the node directly.
-            # This is required for kind port mappings (extraPortMappings) to work efficiently.
             hostNetwork: true
             nodeSelector:
                 ingress-ready: "true"
@@ -117,20 +116,15 @@ spec:
                       - --entrypoints.websecure.address=:443
                       - --providers.kubernetesingress
                       - --providers.kubernetesingress.ingressclass=traefik
-                      # ACME/Let's Encrypt configuration for DuckDNS
                       - --certificatesresolvers.letsencrypt.acme.email=svb-milestone2@duckdns.org
                       - --certificatesresolvers.letsencrypt.acme.storage=/acme/acme.json
                       - --certificatesresolvers.letsencrypt.acme.dnschallenge=true
                       - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=duckdns
                       - --certificatesresolvers.letsencrypt.acme.dnschallenge.delaybeforecheck=120
-                      # Use authoritative DNS servers to avoid SERVFAIL with DuckDNS
                       - --certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
                       - --certificatesresolvers.letsencrypt.acme.dnschallenge.disablepropagationcheck=true
-                      # Use Let's Encrypt Production
                       - --certificatesresolvers.letsencrypt.acme.caserver=https://acme-v02.api.letsencrypt.org/directory
-                      # Enable Prometheus metrics
                       - --metrics.prometheus=true
-                      # Enable Ping for health checks
                       - --ping
                       - --ping.entrypoint=ping
                       - --entrypoints.ping.address=:8082
@@ -181,8 +175,7 @@ spec:
                   persistentVolumeClaim:
                       claimName: traefik-acme-storage
 ---
-# PersistentVolumeClaim for ACME certificate storage
-# This ensures certificates survive pod restarts
+# hiermee zorgen we ervoor dat als de pod herstart wordt, de ons TLS certificaat niet verloren gaat
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -195,6 +188,7 @@ spec:
         requests:
             storage: 100Mi
 ---
+# hiermee zorgen we ervoor dat traefik altijd op de juiste poorten luistert
 apiVersion: v1
 kind: Service
 metadata:

@@ -1,3 +1,4 @@
+# onze prometheus monitoring voor onze traefik ingress controller
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -15,4 +16,4 @@ spec:
   endpoints:
   - port: web
     path: /metrics
-    interval: 15s
+    interval: 15s # elke 15 seconden wordt er een metric gemaakt

@@ -1,16 +1,3 @@
-# Kubernetes ConfigMap for SVB Webstack
-# ======================================
-# ConfigMaps store non-sensitive configuration data as key-value pairs.
-#
-# WHY CONFIGMAPS?
-# - Separate configuration from container images
-# - Easy to update without rebuilding images
-# - Can be mounted as files or environment variables
-# - Follows 12-Factor App methodology
-#
-# USAGE:
-#   kubectl apply -f configmap.yaml -n svb-webstack
-
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -20,11 +7,7 @@ metadata:
         app.kubernetes.io/name: svb-webstack
         app.kubernetes.io/component: backend
 data:
-    # Database connection configuration
-    # WHY these values?
-    # - DB_HOST: Kubernetes service name (DNS resolution within cluster)
-    # - DB_PORT: PostgreSQL default port
-    # - DB_NAME: Must match the database created in the Secret
+    # dit zijn de variabelen voor de database connectie
     DB_HOST: "svb-database"
     DB_PORT: "5432"
     DB_NAME: "webstack"

@@ -1,19 +1,3 @@
-# Kubernetes Nginx Frontend Deployment
-# =====================================
-# This file defines all resources needed to run the Nginx frontend.
-#
-# RESOURCES DEFINED:
-# 1. Deployment - Manages frontend pods
-# 2. Service - Network endpoint for frontend access
-#
-# USAGE:
-#   kubectl apply -f frontend.yaml -n svb-webstack
-
----
-# ==============================================================================
-# DEPLOYMENT
-# ==============================================================================
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -23,10 +7,6 @@ metadata:
         app.kubernetes.io/name: svb-webstack
         app.kubernetes.io/component: frontend
 spec:
-    # Single replica for frontend
-    # WHY 1 replica?
-    # - Static content, less critical than backend
-    # - Can increase for high availability
     replicas: 1
 
     selector:
@@ -48,7 +28,6 @@ spec:
         spec:
             containers:
                 - name: frontend
-                  # Image built from frontend/Dockerfile
                   image: svb-frontend:latest
                   imagePullPolicy: Never
 
@@ -56,7 +35,6 @@ spec:
                       - containerPort: 80
                         name: http
 
-                  # Resource limits
                   resources:
                       requests:
                           memory: "64Mi"
@@ -65,7 +43,6 @@ spec:
                           memory: "128Mi"
                           cpu: "200m"
 
-                  # Liveness probe
                   livenessProbe:
                       httpGet:
                           path: /health
@@ -75,7 +52,6 @@ spec:
                       timeoutSeconds: 3
                       failureThreshold: 3
 
-                  # Readiness probe
                   readinessProbe:
                       httpGet:
                           path: /health
@@ -86,10 +62,10 @@ spec:
                       failureThreshold: 3
 
 ---
-# ==============================================================================
-# SERVICE
-# ==============================================================================
 
+# hier gebruiken we een nodeport, deze is wel toegangelijk aan de buitenwereld. Zo kunnen we onze frontend toegankelijk maken buiten de cluster. 
+# waarom we dit wel toegankelijk maken aan de buitenwerled is zodat we ook kunnen testen of onze frontend goed werkt zonder dat onze ingress controller hoeft te werken.
+# voor productie is een ingress controller altijd aan te raden omdat deze beter is voor veiligheid en betere performance.
 apiVersion: v1
 kind: Service
 metadata:
@@ -99,11 +75,6 @@ metadata:
         app.kubernetes.io/name: svb-webstack
         app.kubernetes.io/component: frontend
 spec:
-    # NodePort for external access (alternative to Ingress)
-    # WHY NodePort?
-    # - Allows access from outside the cluster
-    # - Works without Ingress controller
-    # - Port 30080 is accessible on any node
     type: NodePort
 
     selector:
@@ -113,6 +84,6 @@ spec:
     ports:
         - port: 80
           targetPort: 80
-          nodePort: 30080 # Fixed port for easy access
+          nodePort: 30080 # None default poort (om niet onze host ports te clutteren)
           protocol: TCP
           name: http
