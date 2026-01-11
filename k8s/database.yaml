@@ -95,8 +95,9 @@ spec:
         spec:
             containers:
                 - name: postgres
-                  # Official PostgreSQL image
-                  image: postgres:15-alpine
+                  # Custom image with baked-in init.sql
+                  image: svb-database:latest
+                  imagePullPolicy: Never
 
                   # Container ports
                   ports:
@@ -121,12 +122,6 @@ spec:
                         # - Some PVs have lost+found directory
                         # - subPath creates a subdirectory for data
                         subPath: pgdata
-                      # Mount init scripts for first-time initialization
-                      # WHY /docker-entrypoint-initdb.d/?
-                      # - PostgreSQL image runs .sql files from here on first start
-                      # - Creates tables and inserts default data
-                      - name: init-scripts
-                        mountPath: /docker-entrypoint-initdb.d
 
                   # Resource limits and requests
                   # WHY set resources?
@@ -181,13 +176,6 @@ spec:
                 - name: postgres-data
                   persistentVolumeClaim:
                       claimName: svb-database-pvc
-                # Init scripts from ConfigMap
-                # WHY ConfigMap for init scripts?
-                # - Easy to update without rebuilding images
-                # - Version controlled with other K8s manifests
-                - name: init-scripts
-                  configMap:
-                      name: svb-db-init-scripts
 
 ---
 # ==============================================================================

@@ -1,24 +1,5 @@
-# Kubernetes FastAPI Backend Deployment
-# ======================================
-# This file defines all resources needed to run the FastAPI backend.
-#
-# RESOURCES DEFINED:
-# 1. Deployment - Manages backend pods with scaling and updates
-# 2. Service - Network endpoint for backend access
-#
-# WHY DEPLOYMENT?
-# - Declarative updates for pods
-# - Rolling updates with zero downtime
-# - Easy scaling and rollback
-#
-# USAGE:
-#   kubectl apply -f backend.yaml -n svb-webstack
-
----
-# ==============================================================================
-# DEPLOYMENT
-# ==============================================================================
-
+# we gebruiken een deployment om de backend te laten draaien
+# zo is het makkelijk om onze backend te updaten & schalen
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -28,28 +9,20 @@ metadata:
         app.kubernetes.io/name: svb-webstack
         app.kubernetes.io/component: backend
 spec:
-    # Number of pod replicas
-    # WHY 2 replicas?
-    # - High availability: one pod can serve while another restarts
-    # - Load balancing demonstration (see container ID on frontend)
-    # - Extra points: "scaling of API across nodes"
+    # we willen 2 replicas van onze backend hebben
     replicas: 2
 
-    # Selector must match template labels
     selector:
         matchLabels:
             app.kubernetes.io/name: svb-webstack
             app.kubernetes.io/component: backend
 
-    # Update strategy
-    # WHY RollingUpdate?
-    # - Zero-downtime deployments
-    # - Gradually replaces old pods with new ones
+    # hiermee hebben we 0 downtime tijdens een update
     strategy:
         type: RollingUpdate
         rollingUpdate:
-            maxSurge: 1 # Can have 1 extra pod during update
-            maxUnavailable: 0 # All pods must be available during update
+            maxSurge: 1 # maximaal 1 extra pod tijdens update
+            maxUnavailable: 0 # alle pods moeten beschikbaar zijn tijdens update
 
     template:
         metadata:
@@ -63,29 +36,23 @@ spec:
         spec:
             containers:
                 - name: backend
-                  # Image built from backend/Dockerfile
-                  # NOTE: For kind, you need to load the image:
-                  #   kind load docker-image svb-backend:latest --name svb-cluster
+                 # we gebruiken onze eigen image gemaakt van de Dockerfile in de backend map
                   image: svb-backend:latest
 
-                  # ImagePullPolicy
-                  # WHY Never?
-                  # - For local development with kind
-                  # - Image is loaded directly into kind nodes
-                  # - Change to Always for production with registry
+                  # we willen alleen een lokale image gebruiken, aangezien we lokaal in kind werken
                   imagePullPolicy: Never
-
-                  # Container port
+                
+                # komt overeen met de poort in de dockerfile (default poort voor uvicorn)
                   ports:
                       - containerPort: 8000
                         name: http
 
-                  # Environment variables from ConfigMap
+                  # environment variables van de configmap
                   envFrom:
                       - configMapRef:
                             name: svb-backend-config
 
-                  # Environment variables from Secret
+                  # environment variables van de secret (ja we gebruiken nu wel een secret)
                   env:
                       - name: DB_USER
                         valueFrom:
@@ -98,7 +65,7 @@ spec:
                                 name: svb-db-credentials
                                 key: POSTGRES_PASSWORD
 
-                  # Resource limits
+                  # we zetten een resource limiet 
                   resources:
                       requests:
                           memory: "128Mi"
@@ -107,11 +74,7 @@ spec:
                           memory: "256Mi"
                           cpu: "500m"
 
-                  # Liveness probe - restart if unhealthy
-                  # WHY /api/health?
-                  # - Custom health endpoint in FastAPI
-                  # - Checks database connectivity
-                  # - Extra points: "Health check monitoring that restarts automatically"
+                  # we gebruiken een liveness probe om te controleren of onze backend nog steeds draait
                   livenessProbe:
                       httpGet:
                           path: /api/health
@@ -121,7 +84,7 @@ spec:
                       timeoutSeconds: 5
                       failureThreshold: 3
 
-                  # Readiness probe - remove from load balancer if not ready
+                  # we gebruiken een readiness probe om te controleren of onze backend klaar is om berichten te krijgen
                   readinessProbe:
                       httpGet:
                           path: /api/health
@@ -132,10 +95,8 @@ spec:
                       failureThreshold: 3
 
 ---
-# ==============================================================================
-# SERVICE
-# ==============================================================================
 
+# We gebruiken een service om de backend toegankelijk te maken in de cluster (niet extern)
 apiVersion: v1
 kind: Service
 metadata:
@@ -145,10 +106,6 @@ metadata:
         app.kubernetes.io/name: svb-webstack
         app.kubernetes.io/component: backend
 spec:
-    # ClusterIP for internal access
-    # WHY ClusterIP?
-    # - Backend is accessed through Ingress or Frontend
-    # - No need to expose directly
     type: ClusterIP
 
     selector:

@@ -104,6 +104,10 @@ docker build -t svb-backend:latest ./backend
 echo -e "${BLUE}Building svb-frontend...${NC}"
 docker build -t svb-frontend:latest ./frontend
 
+# Build database image
+echo -e "${BLUE}Building svb-database...${NC}"
+docker build -t svb-database:latest ./database
+
 echo -e "${GREEN}✓ Images built successfully${NC}"
 echo ""
 
@@ -117,6 +121,7 @@ echo -e "${YELLOW}[Step 4/6] Loading images into kind cluster...${NC}"
 # - We need to load the images into the kind cluster's container runtime
 kind load docker-image svb-backend:latest --name ${CLUSTER_NAME}
 kind load docker-image svb-frontend:latest --name ${CLUSTER_NAME}
+kind load docker-image svb-database:latest --name ${CLUSTER_NAME}
 
 echo -e "${GREEN}✓ Images loaded into cluster${NC}"
 echo ""
